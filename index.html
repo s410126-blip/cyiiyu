@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebAR 3D 模型展示</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        }
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            transition: opacity 0.5s;
+        }
+        #loading.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: #00ffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px 0;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .progress-container {
+            width: 280px;
+            height: 8px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00ffff, #0099ff);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .status {
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        #instructions {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,191,255,0.95);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            z-index: 999;
+            text-align: center;
+            max-width: 85%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: none;
+        }
+        #instructions.show {
+            display: block;
+        }
+        #tip {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            z-index: 998;
+            text-align: center;
+        }
+        #controls {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 998;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #controls.show {
+            display: flex;
+        }
+        .control-btn {
+            width: 50px;
+            height: 50px;
+            background: rgba(0,191,255,0.9);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+        .control-btn:active {
+            transform: scale(0.9);
+        }
+        .control-btn.active {
+            background: rgba(255,100,0,0.9);
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div style="font-size: 48px; margin-bottom: 20px;">🎯</div>
+        <div class="loader"></div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="status" id="statusText">正在載入 AR 體驗...</div>
+    </div>
+
+    <div id="instructions">
+        📷 將相機對準特徵圖片
+    </div>
+
+    <div id="tip">
+        💡 保持手機穩定，距離 20-50 公分
+    </div>
+
+    <!-- 控制按鈕 -->
+    <div id="controls">
+        <div class="control-btn" id="rotateBtn" title="旋轉開關">
+            🔄
+        </div>
+        <div class="control-btn" id="animBtn" title="動畫播放">
+            ▶️
+        </div>
+    </div>
+
+    <a-scene 
+        mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiLoading: no; uiError: no; uiScanning: no; filterMinCF: 0.0001; filterBeta: 0.001;"
+        color-space="sRGB" 
+        renderer="colorManagement: true, physicallyCorrectLights: true; antialias: true; precision: medium;" 
+        vr-mode-ui="enabled: false" 
+        device-orientation-permission-ui="enabled: false"
+        loading-screen="enabled: false">
+        
+        <a-assets timeout="30000">
+            <!-- 
+            請將你的 GLB 檔案命名為 model.glb 並上傳到與此 HTML 檔案相同的目錄
+            或者修改下方的 src 路徑指向你的 GLB 檔案
+            -->
+            <a-asset-item id="model3d" src="./model.glb"></a-asset-item>
+        </a-assets>
+
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+        <!-- AR 內容 -->
+        <a-entity id="arTarget" mindar-image-target="targetIndex: 0">
+            
+            <!-- 3D 模型 -->
+            <a-entity 
+                id="model"
+                gltf-model="#model3d"
+                position="0 0 0"
+                rotation="0 0 0"
+                scale="0.5 0.5 0.5"
+                animation-mixer="clip: *; loop: repeat; clampWhenFinished: false"
+                visible="false">
+            </a-entity>
+
+            <!-- 裝飾光環 -->
+            <a-ring 
+                position="0 0 -0.05" 
+                radius-inner="0.3" 
+                radius-outer="0.35" 
+                color="#00ffff" 
+                opacity="0.5"
+                animation="property: rotation; to: 0 0 360; dur: 3000; loop: true; easing: linear">
+            </a-ring>
+
+            <!-- 提示文字 -->
+            <a-text 
+                id="modelHint"
+                value="3D 模型載入中..." 
+                position="0 -0.7 0" 
+                align="center" 
+                color="#00ffff"
+                width="2"
+                visible="false">
+            </a-text>
+
+        </a-entity>
+    </a-scene>
+
+    <script>
+        // 載入管理
+        const LoadingManager = {
+            progress: 0,
+            progressBar: document.getElementById('progressBar'),
+            statusText: document.getElementById('statusText'),
+            loadingEl: document.getElementById('loading'),
+            
+            setProgress(percent, status) {
+                this.progress = Math.min(percent, 100);
+                this.progressBar.style.width = this.progress + '%';
+                if (status) this.statusText.textContent = status;
+            },
+            
+            complete() {
+                this.setProgress(100, '準備完成！');
+                setTimeout(() => {
+                    this.loadingEl.classList.add('fade-out');
+                    setTimeout(() => {
+                        this.loadingEl.style.display = 'none';
+                        document.getElementById('instructions').classList.add('show');
+                    }, 500);
+                }, 300);
+            }
+        };
+
+        // 模擬載入進度
+        let simulatedProgress = 0;
+        const progressInterval = setInterval(() => {
+            if (simulatedProgress < 70) {
+                simulatedProgress += Math.random() * 8;
+                LoadingManager.setProgress(simulatedProgress, '載入 AR 引擎...');
+            }
+        }, 400);
+
+        // 元素引用
+        const sceneEl = document.querySelector('a-scene');
+        const modelEl = document.querySelector('#model');
+        const targetEl = document.querySelector('#arTarget');
+        const tipEl = document.getElementById('tip');
+        const controlsEl = document.getElementById('controls');
+        const rotateBtn = document.getElementById('rotateBtn');
+        const animBtn = document.getElementById('animBtn');
+        const modelHint = document.querySelector('#modelHint');
+
+        // 狀態變數
+        let modelLoaded = false;
+        let isRotating = false;
+        let animationPlaying = false;
+        let mixer = null;
+
+        // A-Frame 場景事件
+        sceneEl.addEventListener('loaded', () => {
+            console.log('[場景] A-Frame 已載入');
+            clearInterval(progressInterval);
+            LoadingManager.setProgress(90, '初始化相機...');
+        });
+
+        sceneEl.addEventListener('arReady', () => {
+            console.log('[AR] 系統就緒！');
+            clearInterval(progressInterval);
+            LoadingManager.complete();
+        });
+
+        sceneEl.addEventListener('arError', (event) => {
+            console.error('[AR] 錯誤:', event.detail);
+            LoadingManager.setProgress(0, 'AR 初始化失敗');
+            alert('AR 初始化失敗！請確認瀏覽器支援並已授予相機權限。');
+        });
+
+        // 3D 模型載入事件
+        modelEl.addEventListener('model-loaded', () => {
+            console.log('[模型] ✓ 3D 模型載入完成');
+            modelLoaded = true;
+            modelHint.setAttribute('value', '✨ 3D 模型就緒');
+            
+            // 取得動畫混合器
+            const mesh = modelEl.getObject3D('mesh');
+            if (mesh) {
+                mixer = modelEl.components['animation-mixer'];
+                if (mixer && mixer.mixer) {
+                    console.log('[動畫] 模型包含動畫');
+                    // 預設暫停動畫
+                    mixer.mixer.timeScale = 0;
+                } else {
+                    console.log('[動畫] 模型沒有內建動畫');
+                }
+            }
+        });
+
+        modelEl.addEventListener('model-error', (error) => {
+            console.error('[模型] 載入失敗:', error);
+            alert('3D 模型載入失敗！\n\n請確認：\n1. model.glb 檔案已上傳\n2. 檔案路徑正確\n3. 檔案格式正確（GLB/GLTF）');
+            modelHint.setAttribute('value', '❌ 模型載入失敗');
+        });
+
+        // 標記追蹤
+        targetEl.addEventListener('targetFound', () => {
+            console.log('[追蹤] ✓ 找到特徵圖！');
+            tipEl.textContent = '✓ 辨識成功！';
+            controlsEl.classList.add('show');
+            
+            if (modelLoaded) {
+                showModel();
+            } else {
+                modelHint.setAttribute('visible', 'true');
+            }
+        });
+
+        targetEl.addEventListener('targetLost', () => {
+            console.log('[追蹤] 失去特徵圖');
+            tipEl.textContent = '💡 保持手機穩定，距離 20-50 公分';
+            hideModel();
+        });
+
+        // 顯示模型
+        function showModel() {
+            modelEl.setAttribute('visible', 'true');
+            modelHint.setAttribute('visible', 'false');
+            
+            // 淡入動畫
+            modelEl.setAttribute('animation__fadein', {
+                property: 'scale',
+                from: '0.1 0.1 0.1',
+                to: '0.5 0.5 0.5',
+                dur: 800,
+                easing: 'easeOutElastic'
+            });
+            
+            console.log('[顯示] 3D 模型已顯示');
+        }
+
+        // 隱藏模型
+        function hideModel() {
+            modelEl.setAttribute('visible', 'false');
+            modelHint.setAttribute('visible', 'false');
+            console.log('[隱藏] 3D 模型已隱藏');
+        }
+
+        // 旋轉控制
+        rotateBtn.addEventListener('click', () => {
+            isRotating = !isRotating;
+            
+            if (isRotating) {
+                // 開始旋轉
+                modelEl.setAttribute('animation__rotate', {
+                    property: 'rotation',
+                    to: '0 360 0',
+                    dur: 8000,
+                    loop: true,
+                    easing: 'linear'
+                });
+                rotateBtn.classList.add('active');
+                console.log('[旋轉] 開啟');
+            } else {
+                // 停止旋轉
+                modelEl.removeAttribute('animation__rotate');
+                rotateBtn.classList.remove('active');
+                console.log('[旋轉] 關閉');
+            }
+        });
+
+        // 動畫控制
+        animBtn.addEventListener('click', () => {
+            if (!mixer || !mixer.mixer) {
+                alert('此模型沒有內建動畫！');
+                return;
+            }
+            
+            animationPlaying = !animationPlaying;
+            
+            if (animationPlaying) {
+                // 播放動畫
+                mixer.mixer.timeScale = 1;
+                animBtn.classList.add('active');
+                animBtn.textContent = '⏸️';
+                console.log('[動畫] 播放');
+            } else {
+                // 暫停動畫
+                mixer.mixer.timeScale = 0;
+                animBtn.classList.remove('active');
+                animBtn.textContent = '▶️';
+                console.log('[動畫] 暫停');
+            }
+        });
+
+        // 錯誤處理
+        window.addEventListener('error', (e) => {
+            console.error('[全域錯誤]', e.message);
+        });
+
+        // 檢查必要檔案
+        fetch('./targets.mind')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('找不到 targets.mind 檔案');
+                }
+                console.log('✓ targets.mind 檔案存在');
+                LoadingManager.setProgress(50, '載入特徵圖...');
+            })
+            .catch(err => {
+                console.error(err.message);
+                alert('找不到 targets.mind 檔案！\n\n請使用 MindAR 編譯器生成：\nhttps://hiukim.github.io/mind-ar-js-doc/tools/compile');
+            });
+
+        fetch('./model.glb')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('找不到 model.glb 檔案');
+                }
+                console.log('✓ model.glb 檔案存在');
+                LoadingManager.setProgress(60, '載入 3D 模型...');
+            })
+            .catch(err => {
+                console.error(err.message);
+                console.warn('⚠️ 找不到 model.glb - 請上傳你的 GLB 檔案');
+            });
+
+        // 額外功能：點擊模型放大
+        let isScaled = false;
+        modelEl.addEventListener('click', () => {
+            isScaled = !isScaled;
+            const newScale = isScaled ? '0.7 0.7 0.7' : '0.5 0.5 0.5';
+            
+            modelEl.setAttribute('animation__scale', {
+                property: 'scale',
+                to: newScale,
+                dur: 500,
+                easing: 'easeInOutQuad'
+            });
+            
+            console.log('[互動] 模型縮放:', isScaled ? '放大' : '恢復');
+        });
+    </script>
+</body>
+</html>
